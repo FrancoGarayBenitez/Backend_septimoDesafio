@@ -4,17 +4,18 @@ const local = require('passport-local');
 //Import model
 const { userModel } = require('../models/user.model');
 //Import utils.js
-const { createHash, isValidatePassword } = require('../../utils');
+const { createHash, isValidatePassword } = require('../utils');
 //Import passport github
 const GitHubStrategy = require('passport-github2');
+//Import JWT
+const jwt = require('passport-jwt');
 
-const localStrategy = local.Strategy;
-
-//-----------------------------------------------------//
 
 const initializePassport = () => {
 
     //Estrategia local para registrarse.
+    const localStrategy = local.Strategy;
+
     passport.use("register", new localStrategy(
         { passReqToCallback: true, usernameField: "email" }, async (req, username, password, done) => {
             const { first_name, last_name, email, age } = req.body;
@@ -57,30 +58,7 @@ const initializePassport = () => {
     ))
 
 
-    //Estrategia local para logearse.
-    passport.use("login", new localStrategy({ usernameField: "email" }, async (username, password, done) => {
-        try {
-            //Buscar usuario en la base.
-            const user = await userModel.findOne({ email: username })
-
-            
-            //Validación por si no existe el usuario.
-            if (!user) {
-                console.log("User no existe.");
-                return done(null, false);
-            }
-
-            //Comparación del pass del usuario con el pass hasheado.
-            if (!isValidatePassword(user, password)) return done(null, false);
-
-            //Resolución.
-            return done(null, user);
-
-        } catch (error) {
-            return done(error);
-        }
-    }))
-
+    //--------------------------------------------------------------//
 
     //Estrategia para autenticarse con GitHub.
     passport.use("github", new GitHubStrategy({
@@ -98,7 +76,7 @@ const initializePassport = () => {
                 let newUser = {
                     first_name: profile._json.name,
                     last_name: "",
-                    age:27,
+                    age: 27,
                     email: profile._json.email,
                     password: ""
                 }
@@ -117,19 +95,51 @@ const initializePassport = () => {
     }
     ))
 
+
+    //-----------------------------------------------------------------//
+
+    //Estrategia para logearse con JWT
+    const cookieExtractor = req => {
+        let token = null;
+
+        if (req && req.cookies) {
+            token = req.cookies["coderCookieToken"]
+        }
+
+        return token;
+    }
+
+    const JWTStrategy = jwt.Strategy;
+    const ExtractJWT = jwt.ExtractJwt;
+
+    passport.use("jwt", new JWTStrategy({
+
+        jwtFromRequest: ExtractJWT.fromExtractors([cookieExtractor]),
+        secretOrKey: "coderSecret"
+
+    }, async (jwt_payload, done) => {
+        try {
+            return done(null, jwt_payload)
+        } catch (error) {
+            return done(error)
+        }
+    }
+    ))
+
+
+    //---------------------------------------------------------------//
+
     //Serializar y deserializar.
     passport.serializeUser((user, done) => {
         done(null, user._id);
     })
 
     passport.deserializeUser(async (id, done) => {
-        let user = await userModel.findById(id);
+        let user = await userModel.findById({ _id: id });
         done(null, user);
     })
+
 }
-
-
-//----------------------------------------------------//
 
 
 module.exports = initializePassport;

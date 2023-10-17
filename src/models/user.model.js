@@ -7,8 +7,27 @@ const userSchema = new mongoose.Schema({
     email: String,
     age: String,
     password: String,
-    role: { type: String, default: "usuario" }
+    role: { type: String, default: "user" },
+
+    carts: {
+        type: [
+            {
+                cart: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "carts",
+                    autopopulate: true,
+                },
+                cart_sku: { type: String, required: true }
+            }
+        ],
+        default: []
+    }
+
 })
+
+
+//Populate
+userSchema.plugin(require('mongoose-autopopulate'));
 
 const userModel = mongoose.model(userCollection, userSchema)
 
